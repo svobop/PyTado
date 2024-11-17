@@ -31,7 +31,7 @@ class Tado:
     refresh_at = datetime.datetime.now() + datetime.timedelta(minutes=5)
 
     # 'Private' methods for use in class, Tado mobile API V1.9.
-    def _mobile_apiCall(self, cmd):
+    def _mobile_api_call(self, cmd):
         # pylint: disable=C0103
 
         self._refresh_token()
@@ -53,7 +53,7 @@ class Tado:
         return data
 
     # 'Private' methods for use in class, Tado API V2.
-    def _apiCall(self, cmd, method="GET", data=None, plain=False):
+    def _api_call(self, cmd, method="GET", data=None, plain=False):
         # pylint: disable=C0103
 
         self._refresh_token()
@@ -91,7 +91,7 @@ class Tado:
         data = json.loads(str_response)
         return data
 
-    def _setOAuthHeader(self, data):
+    def _set_o_auth_header(self, data):
         # pylint: disable=C0103
 
         access_token = data['access_token']
@@ -128,10 +128,10 @@ class Tado:
         response = self.opener.open(req)
         str_response = response.read().decode('utf-8')
 
-        self._setOAuthHeader(json.loads(str_response))
+        self._set_o_auth_header(json.loads(str_response))
         return response
 
-    def _loginV2(self, username, password):
+    def _login_v2(self, username, password):
         # pylint: disable=C0103
 
         headers = self.headers
@@ -154,15 +154,15 @@ class Tado:
         response = self.opener.open(req)
         str_response = response.read().decode('utf-8')
 
-        self._setOAuthHeader(json.loads(str_response))
+        self._set_o_auth_header(json.loads(str_response))
         return response
 
-    def setDebugging(self, debugCalls):
-        self._debugCalls = debugCalls
+    def set_debugging(self, debug_calls):
+        self._debugCalls = debug_calls
         return self._debugCalls
 
     # Public interface
-    def getMe(self):
+    def get_me(self):
         """Gets home information."""
         # pylint: disable=C0103
 
@@ -173,79 +173,79 @@ class Tado:
         data = json.loads(str_response)
         return data
 
-    def getDevices(self):
+    def get_devices(self):
         """Gets device information."""
         # pylint: disable=C0103
 
         cmd = 'devices'
-        data = self._apiCall(cmd)
+        data = self._api_call(cmd)
         return data
 
-    def getZones(self):
+    def get_zones(self):
         """Gets zones information."""
         # pylint: disable=C0103
 
         cmd = 'zones'
-        data = self._apiCall(cmd)
+        data = self._api_call(cmd)
         return data
 
-    def getState(self, zone):
+    def get_state(self, zone):
         """Gets current state of Zone zone."""
         # pylint: disable=C0103
 
         cmd = 'zones/%i/state' % zone
-        data = self._apiCall(cmd)
+        data = self._api_call(cmd)
         return data
 
-    def getCapabilities(self, zone):
+    def get_capabilities(self, zone):
         """Gets current capabilities of Zone zone."""
         # pylint: disable=C0103
 
         cmd = 'zones/%i/capabilities' % zone
-        data = self._apiCall(cmd)
+        data = self._api_call(cmd)
         return data
 
-    def getClimate(self, zone):
+    def get_climate(self, zone):
         """Gets temp (centigrade) and humidity (% RH) for Zone zone."""
         # pylint: disable=C0103
 
-        data = self.getState(zone)['sensorDataPoints']
+        data = self.get_state(zone)['sensorDataPoints']
         return {'temperature' : data['insideTemperature']['celsius'],
                 'humidity'    : data['humidity']['percentage']}
 
-    def getWeather(self):
+    def get_weather(self):
         """Gets outside weather data"""
         # pylint: disable=C0103
 
         cmd = 'weather'
-        data = self._apiCall(cmd)
+        data = self._api_call(cmd)
         return data
 
-    def getAppUsers(self):
+    def get_app_users(self):
         """Gets getAppUsers data"""
         # pylint: disable=C0103
 
         cmd = 'getAppUsers'
-        data = self._mobile_apiCall(cmd)
+        data = self._mobile_api_call(cmd)
         return data
 
-    def getAppUsersRelativePositions(self):
+    def get_app_users_relative_positions(self):
         """Gets getAppUsersRelativePositions data"""
         # pylint: disable=C0103
 
         cmd = 'getAppUsersRelativePositions'
-        data = self._mobile_apiCall(cmd)
+        data = self._mobile_api_call(cmd)
         return data
 
-    def resetZoneOverlay(self, zone):
+    def reset_zone_overlay(self, zone):
         """Delete current overlay"""
         # pylint: disable=C0103
 
         cmd = 'zones/%i/overlay' % zone
-        data = self._apiCall(cmd, "DELETE", {}, True)
+        data = self._api_call(cmd, "DELETE", {}, True)
         return data
 
-    def setZoneOverlay(self, zone, overlayMode, setTemp=None, duration=None, deviceType='HEATING', power="ON", mode=None):
+    def set_zone_overlay(self, zone, overlay_mode, set_temp=None, duration=None, device_type='HEATING', power="ON", mode=None):
         """set current overlay for a zone"""
         # pylint: disable=C0103
 
@@ -256,35 +256,35 @@ class Tado:
             "termination" : {}
         }
 
-        if setTemp is None:
+        if set_temp is None:
             post_data["setting"] = {
-                "type": deviceType,
+                "type": device_type,
                 "power": power
             }
         elif mode is not None:
             post_data["setting"] = {
-                "type": deviceType,
+                "type": device_type,
                 "power": power,
                 "mode": mode,
                 "temperature":{
-                    "celsius": setTemp
+                    "celsius": set_temp
                 }
             }
         else:
             post_data["setting"] = {
-                "type": deviceType,
+                "type": device_type,
                 "power": power,
                 "temperature":{
-                    "celsius": setTemp
+                    "celsius": set_temp
                 }
             }
 
-        post_data["termination"] = {"type" : overlayMode}
+        post_data["termination"] = {"type" : overlay_mode}
 
         if duration is not None:
             post_data["termination"]["durationInSeconds"] = duration
 
-        data = self._apiCall(cmd, "PUT", post_data)
+        data = self._api_call(cmd, "PUT", post_data)
         return data
 
     # Ctor
@@ -298,5 +298,5 @@ class Tado:
         self.opener = urllib.request.build_opener(
             urllib.request.HTTPCookieProcessor(cj),
             urllib.request.HTTPSHandler())
-        self._loginV2(username, password)
-        self.id = self.getMe()['homes'][0]['id']
+        self._login_v2(username, password)
+        self.id = self.get_me()['homes'][0]['id']

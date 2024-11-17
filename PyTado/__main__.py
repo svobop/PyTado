@@ -16,17 +16,17 @@ def log_in(email, password):
 
 def get_me(args):
     t = log_in(args.email, args.password)
-    me = tado_client.getMe(t)
+    me = tado_client.get_me(t)
     print(me)
 
 def get_state(args):
     t = log_in(args.email, args.password)
-    zone = tado_client.getState(t,int(args.zone))
+    zone = tado_client.get_state(t, int(args.zone))
     print(zone)
 
 def get_capabilities(args):
     t = log_in(args.email, args.password)
-    capabilities = tado_client.getCapabilities(t,int(args.zone))
+    capabilities = tado_client.get_capabilities(t, int(args.zone))
     print(capabilities)
 
 def main():
@@ -39,7 +39,7 @@ def main():
     # Required flags go here.
     required_flags.add_argument('--email',
                                 required=True,
-                                help=('Tado username in the form of an email address.'))
+                                help='Tado username in the form of an email address.')
     required_flags.add_argument('--password',
                                 required=True,
                                 help='Tado password.')
