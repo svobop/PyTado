@@ -27,12 +27,12 @@ class Tado:
     headers = {'Referer' : 'https://my.tado.com/'}
     api2url = 'https://my.tado.com/api/v2/homes/'
     mobi2url = 'https://my.tado.com/mobile/1.9/'
+    hops2url = 'https://hops.tado.com/homes'
     refresh_token = ''
     refresh_at = datetime.datetime.now() + datetime.timedelta(minutes=5)
 
     # 'Private' methods for use in class, Tado mobile API V1.9.
     def _mobile_api_call(self, cmd):
-        # pylint: disable=C0103
 
         self._refresh_token()
 
@@ -54,7 +54,6 @@ class Tado:
 
     # 'Private' methods for use in class, Tado API V2.
     def _api_call(self, cmd, method="GET", data=None, plain=False):
-        # pylint: disable=C0103
 
         self._refresh_token()
 
@@ -91,8 +90,45 @@ class Tado:
         data = json.loads(str_response)
         return data
 
+
+    # 'Private' methods for use in class, Tado API V2.
+    def _hops_api_call(self, cmd, method="GET", data=None, plain=False):
+
+        self._refresh_token()
+
+        headers = self.headers
+
+        if data is not None:
+            if plain:
+                headers['Content-Type'] = 'text/plain;charset=UTF-8'
+            else:
+                headers['Content-Type'] = 'application/json;charset=UTF-8'
+            headers['Mime-Type'] = 'application/json;charset=UTF-8'
+            data = json.dumps(data).encode('utf8')
+
+        if self._debugCalls:
+            _LOGGER.debug("api call: %s: %s, headers %s, data %s",
+                          method, cmd, headers, data)
+        url = f'{self.hops2url}/{self.id}/{cmd}'
+        req = urllib.request.Request(url,
+                                     headers=headers,
+                                     method=method,
+                                     data=data)
+
+        response = self.opener.open(req)
+
+        if self._debugCalls:
+            _LOGGER.debug("api call: %s: %s, response %s",
+                          method, cmd, response)
+
+        str_response = response.read().decode('utf-8')
+        if str_response is None or str_response == "":
+            return
+
+        data = json.loads(str_response)
+        return data
+
     def _set_o_auth_header(self, data):
-        # pylint: disable=C0103
 
         access_token = data['access_token']
         expires_in = float(data['expires_in'])
@@ -132,7 +168,6 @@ class Tado:
         return response
 
     def _login_v2(self, username, password):
-        # pylint: disable=C0103
 
         headers = self.headers
         headers['Content-Type'] = 'application/json'
@@ -162,10 +197,8 @@ class Tado:
         return self._debugCalls
 
     # Public interface
-    def get_me(self):
+    def get_me(self) -> dict:
         """Gets home information."""
-        # pylint: disable=C0103
-
         url = 'https://my.tado.com/api/v2/me'
         req = urllib.request.Request(url, headers=self.headers)
         response = self.opener.open(req)
@@ -173,126 +206,129 @@ class Tado:
         data = json.loads(str_response)
         return data
 
-    def get_devices(self):
-        """Gets device information."""
-        # pylint: disable=C0103
+    def get_rooms_and_devices(self) -> dict:
+        """Gets room and device information."""
+        cmd = 'roomsAndDevices'
+        data = self._hops_api_call(cmd)
+        return data
 
-        cmd = 'devices'
+    def get_rooms(self) -> list[dict]:
+        """Gets rooms information."""
+        cmd = 'rooms'
+        data = self._hops_api_call(cmd)
+        return data
+
+    def get_room(self, room_id: int) -> dict:
+        """Gets room information."""
+        cmd = f'rooms/{room_id}'
+        data = self._hops_api_call(cmd)
+        return data
+
+    def get_room_day_report(self, room_id: int, date: datetime.date) -> dict:
+        """Gets room day report with temperature, humidity, heating and weather information."""
+        cmd = f'zones/{room_id}/dayReport?date={date.strftime('%Y-%m-%d')}'
         data = self._api_call(cmd)
         return data
 
-    def get_zones(self):
-        """Gets zones information."""
-        # pylint: disable=C0103
+    def get_air_comfort(self) -> dict:
+        """Gets air comfort information with current temperature, humidity and open window detection."""
+        cmd = f'airComfort'
+        data = self._hops_api_call(cmd)
+        return data
 
-        cmd = 'zones'
+    def get_tado_mode(self) -> dict:
+        """Gets tado mode."""
+        cmd = f'state'
         data = self._api_call(cmd)
+        return data['presence']
+
+    def set_home(self) -> None:
+        """Sets tado mode to home."""
+        cmd = f'presenceLock'
+        data = self._api_call(cmd, method="PUT", data={"homePresence": "HOME"})
         return data
 
-    def get_state(self, zone):
-        """Gets current state of Zone zone."""
-        # pylint: disable=C0103
-
-        cmd = 'zones/%i/state' % zone
-        data = self._api_call(cmd)
+    def set_away(self) -> None:
+        """Sets tado mode to away."""
+        cmd = f'presenceLock'
+        data = self._api_call(cmd, method="PUT", data={"homePresence": "AWAY"})
         return data
 
-    def get_capabilities(self, zone):
-        """Gets current capabilities of Zone zone."""
-        # pylint: disable=C0103
-
-        cmd = 'zones/%i/capabilities' % zone
-        data = self._api_call(cmd)
+    def boost_heating(self) -> None:
+        """Boost mode, expires after 30 minutes."""
+        cmd = f'quickActions/boost'
+        data = self._hops_api_call(cmd, method="POST")
         return data
 
-    def get_climate(self, zone):
-        """Gets temp (centigrade) and humidity (% RH) for Zone zone."""
-        # pylint: disable=C0103
-
-        data = self.get_state(zone)['sensorDataPoints']
-        return {'temperature' : data['insideTemperature']['celsius'],
-                'humidity'    : data['humidity']['percentage']}
-
-    def get_weather(self):
-        """Gets outside weather data"""
-        # pylint: disable=C0103
-
-        cmd = 'weather'
-        data = self._api_call(cmd)
+    def disable_heating(self) -> None:
+        """Sets all rooms off, frost protection."""
+        cmd = f'quickActions/allOff'
+        data = self._hops_api_call(cmd, method="POST")
         return data
 
-    def get_app_users(self):
-        """Gets getAppUsers data"""
-        # pylint: disable=C0103
-
-        cmd = 'getAppUsers'
-        data = self._mobile_api_call(cmd)
+    def resume_schedule(self) -> None:
+        """Resumes regular schedule for all rooms, undo boost, disable heating and manual settings."""
+        cmd = f'quickActions/resumeSchedule'
+        data = self._hops_api_call(cmd, method="POST")
         return data
 
-    def get_app_users_relative_positions(self):
-        """Gets getAppUsersRelativePositions data"""
-        # pylint: disable=C0103
-
-        cmd = 'getAppUsersRelativePositions'
-        data = self._mobile_api_call(cmd)
+    def get_room_schedule(self, room_id: int) -> dict:
+        """Get room weekly schedule."""
+        cmd = f'rooms/{room_id}/schedule'
+        data = self._hops_api_call(cmd, method="GET")
         return data
 
-    def reset_zone_overlay(self, zone):
-        """Delete current overlay"""
-        # pylint: disable=C0103
-
-        cmd = 'zones/%i/overlay' % zone
-        data = self._api_call(cmd, "DELETE", {}, True)
-        return data
-
-    def set_zone_overlay(self, zone, overlay_mode, set_temp=None, duration=None, device_type='HEATING', power="ON", mode=None):
-        """set current overlay for a zone"""
-        # pylint: disable=C0103
-
-        cmd = 'zones/%i/overlay' % zone
-
-        post_data = {
-            "setting" : {},
-            "termination" : {}
+    def set_room_schedule(self, room_id: int, schedule: dict) -> dict:
+        """Get room weekly schedule. Can set on day at a time. Sample payload:
+        {
+            "dayType": "SUNDAY",
+            "daySchedule": [
+                {
+                    "start": "00:00",
+                    "end": "07:00",
+                    "dayType": "SUNDAY",
+                    "setting": {
+                        "power": "ON",
+                        "temperature": {
+                            "value": 19
+                        }
+                    }
+                },
+                {
+                    "start": "07:00",
+                    "end": "22:00",
+                    "dayType": "SUNDAY",
+                    "setting": {
+                        "power": "ON",
+                        "temperature": {
+                            "value": 21
+                        }
+                    }
+                },
+                {
+                    "start": "22:00",
+                    "end": "24:00",
+                    "dayType": "SUNDAY",
+                    "setting": {
+                        "power": "ON",
+                        "temperature": {
+                            "value": 19
+                        }
+                    }
+                }
+            ]
         }
-
-        if set_temp is None:
-            post_data["setting"] = {
-                "type": device_type,
-                "power": power
-            }
-        elif mode is not None:
-            post_data["setting"] = {
-                "type": device_type,
-                "power": power,
-                "mode": mode,
-                "temperature":{
-                    "celsius": set_temp
-                }
-            }
-        else:
-            post_data["setting"] = {
-                "type": device_type,
-                "power": power,
-                "temperature":{
-                    "celsius": set_temp
-                }
-            }
-
-        post_data["termination"] = {"type" : overlay_mode}
-
-        if duration is not None:
-            post_data["termination"]["durationInSeconds"] = duration
-
-        data = self._api_call(cmd, "PUT", post_data)
+        """
+        cmd = f'rooms/{room_id}/schedule'
+        data = self._hops_api_call(cmd, method="POST", data=schedule)
         return data
+
 
     # Ctor
     def __init__(self, username, password):
         """Performs login and save session cookie."""
         # HTTPS Interface
 
-        # pylint: disable=C0103
         cj = CookieJar()
 
         self.opener = urllib.request.build_opener(
