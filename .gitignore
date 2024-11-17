@@ -12,3 +12,5 @@ pytado.egg-info
 
 PyCharms
 .idea/
+
+test_credentials.py
